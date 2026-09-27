@@ -1,35 +1,55 @@
-import type { Pedido } from "./types/pedido";
-import type { Status } from "./types/pedido";
-import express = require("express");
+import express from "express";
+import type { Status } from "./types/pedido.ts";
+import type { Pedido } from "./types/pedido.ts";
+import { db } from "./db/db.js";
+import { sql } from "drizzle-orm";
 
 const app = express();
 app.use(express.json());
-app.get("/pedidos", (req, res) => {
-  res.json(pedidos);
+app.get("/pedidos", async (req, res) => {
+  const buscarPedidos = await db.execute(sql`
+    SELECT * FROM pedidos
+    `);
+  res.json(buscarPedidos.rows);
 });
-app.get("/pedidos/:id", (req, res) => {
+app.get("/pedidos/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const pedido = buscarPedido(id);
-  if (!pedido) {
+  const buscarPeloId = await db.execute(sql`
+    SELECT * FROM pedidos WHERE id = ${id}
+    `);
+  if (!pedidos) {
     res.status(404).json({ mensagem: "Pedido não encontrado" });
     return;
   }
-  res.json(pedido);
+  res.json(buscarPeloId.rows);
 });
-app.post("/pedidos", (req, res) => {
-  const pedido = req.body;
-  adicionarPedido(pedido);
-  res.status(201).json(pedido);
+app.post("/pedidos", async (req, res) => {
+  const { produto, preco, status } = req.body;
+  const criarPedido = await db.execute(sql`
+    INSERT INTO pedidos (produto, preco, status)
+    VALUES (${produto}, ${preco}, ${status})
+    RETURNING *
+    `);
+  res.status(201).json(criarPedido.rows);
 });
-app.patch("/pedidos/:id", (req, res) => {
-  const editar = req.body.status;
-  alterarStatus(Number(req.params.id), editar);
-  res.status(200).json(pedidos);
+app.patch("/pedidos/:id", async (req, res) => {
+  const status = req.body.status;
+  const id = req.params.id;
+  const editar = await db.execute(sql`
+    UPDATE pedidos 
+    SET "status" = ${status}
+    WHERE id = ${id}
+    RETURNING *
+    `);
+  res.status(200).json(editar.rows);
 });
-app.delete("/pedidos/:id", (req, res) => {
+app.delete("/pedidos/:id", async (req, res) => {
   const id = Number(req.params.id);
-  deletarPedido(id);
-  res.status(204).send();
+  const deletar = await db.execute(sql`
+    DELETE FROM pedidos
+    WHERE id = ${id}
+    `);
+  res.status(204).send(deletar);
 });
 
 const pedidos: Pedido[] = [
